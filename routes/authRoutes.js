@@ -4,10 +4,15 @@ const passport = require('passport');
 const { signup, login, getCurrentUser, oauthSuccess, oauthFailure } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 
+// Async handler wrapper to catch errors
+const asyncHandler = (fn) => (req, res, next) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
+
 // Traditional auth routes
-router.post('/signup', signup);
-router.post('/login', login);
-router.get('/me', protect, getCurrentUser);
+router.post('/signup', asyncHandler(signup));
+router.post('/login', asyncHandler(login));
+router.get('/me', protect, asyncHandler(getCurrentUser));
 
 // Helper function to check if OAuth is configured
 const isOAuthConfigured = (provider) => {

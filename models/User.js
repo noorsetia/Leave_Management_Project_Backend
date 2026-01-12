@@ -45,10 +45,10 @@ const userSchema = new mongoose.Schema({
 });
 
 // Hash password before saving (only for local auth)
-userSchema.pre('save', async function(next) {
+userSchema.pre('save', async function() {
   // Skip hashing if password not modified or using OAuth
   if (!this.isModified('password') || this.provider !== 'local') {
-    return next();
+    return;
   }
   
   // Only hash if password exists
@@ -56,8 +56,6 @@ userSchema.pre('save', async function(next) {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
   }
-  
-  next();
 });
 
 // Compare password method

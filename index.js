@@ -58,10 +58,14 @@ app.get('/', (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('Error caught in middleware:');
+  console.error('Error message:', err.message);
+  console.error('Error stack:', err.stack);
+  console.error('Error type:', typeof err);
+  
   res.status(err.status || 500).json({
     message: err.message || 'Something went wrong!',
-    error: process.env.NODE_ENV === 'development' ? err : {},
+    error: process.env.NODE_ENV === 'development' ? err.stack : {},
   });
 });
 

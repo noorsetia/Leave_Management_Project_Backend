@@ -38,7 +38,7 @@ const attendanceSchema = new mongoose.Schema({
 });
 
 // Calculate attendance percentage before saving
-attendanceSchema.pre('save', function(next) {
+attendanceSchema.pre('save', function() {
   if (this.totalClasses > 0) {
     this.attendancePercentage = Math.round((this.attendedClasses / this.totalClasses) * 100);
     this.isEligible = this.attendancePercentage >= this.minimumRequired;
@@ -47,7 +47,6 @@ attendanceSchema.pre('save', function(next) {
     this.isEligible = false;
   }
   this.lastUpdated = Date.now();
-  next();
 });
 
 // Method to add attendance

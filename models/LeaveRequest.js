@@ -89,9 +89,8 @@ const leaveRequestSchema = new mongoose.Schema({
 });
 
 // Update timestamp on save
-leaveRequestSchema.pre('save', function(next) {
+leaveRequestSchema.pre('save', function() {
   this.updatedAt = Date.now();
-  next();
 });
 
 // Check if all tests are passed
