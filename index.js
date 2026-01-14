@@ -40,6 +40,7 @@ app.use(passport.session());
 
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/leave', require('./routes/leaveRoutes'));
 
 // Welcome route
 app.get('/', (req, res) => {

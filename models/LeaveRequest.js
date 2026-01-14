@@ -6,9 +6,20 @@ const leaveRequestSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
+  leaveType: {
+    type: String,
+    enum: ['Sick Leave', 'Personal Leave', 'Family Emergency', 'Medical Leave', 'Other'],
+    required: [true, 'Please select a leave type'],
+  },
+  description: {
+    type: String,
+    required: [true, 'Please provide a description for your leave'],
+    trim: true,
+    minlength: [10, 'Description must be at least 10 characters'],
+    maxlength: [500, 'Description cannot exceed 500 characters'],
+  },
   reason: {
     type: String,
-    required: [true, 'Please provide a reason for leave'],
     trim: true,
   },
   startDate: {
@@ -18,10 +29,20 @@ const leaveRequestSchema = new mongoose.Schema({
   endDate: {
     type: Date,
     required: [true, 'Please provide end date'],
+    validate: {
+      validator: function(value) {
+        return value >= this.startDate;
+      },
+      message: 'End date must be after or equal to start date'
+    }
+  },
+  numberOfDays: {
+    type: Number,
+    min: 1,
   },
   status: {
     type: String,
-    enum: ['pending', 'in-progress', 'approved', 'rejected'],
+    enum: ['pending', 'approved', 'rejected'],
     default: 'pending',
   },
   // Quiz Test Results
@@ -88,8 +109,16 @@ const leaveRequestSchema = new mongoose.Schema({
   },
 });
 
-// Update timestamp on save
+// Calculate number of days and update timestamp before saving
 leaveRequestSchema.pre('save', function() {
+  // Calculate number of days between start and end date
+  if (this.startDate && this.endDate) {
+    const start = new Date(this.startDate);
+    const end = new Date(this.endDate);
+    const timeDiff = end.getTime() - start.getTime();
+    this.numberOfDays = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1; // +1 to include both start and end day
+  }
+  
   this.updatedAt = Date.now();
 });
 
