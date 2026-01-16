@@ -2,11 +2,12 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const session = require('express-session');
+
+// Load environment variables FIRST before requiring passport
+dotenv.config();
+
 const passport = require('./config/passport');
 const connectDB = require('./config/db');
-
-// Load environment variables
-dotenv.config();
 
 // Connect to database (non-blocking)
 connectDB().catch(err => {
@@ -41,6 +42,8 @@ app.use(passport.session());
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/leave', require('./routes/leaveRoutes'));
+app.use('/api/dashboard', require('./routes/dashboardRoutes'));
+app.use('/api/quiz', require('./routes/quizRoutes'));
 
 // Welcome route
 app.get('/', (req, res) => {

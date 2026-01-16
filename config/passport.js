@@ -21,7 +21,8 @@ passport.deserializeUser(async (id, done) => {
 // Only initialize Google OAuth if credentials are provided
 if (process.env.GOOGLE_CLIENT_ID && 
     process.env.GOOGLE_CLIENT_SECRET && 
-    process.env.GOOGLE_CLIENT_ID !== 'your-google-client-id') {
+    process.env.GOOGLE_CLIENT_ID !== 'your-google-client-id' &&
+    process.env.GOOGLE_CLIENT_SECRET !== 'your-google-client-secret') {
   
   console.log('✓ Initializing Google OAuth');
   
@@ -85,7 +86,8 @@ if (process.env.GOOGLE_CLIENT_ID &&
 // Only initialize GitHub OAuth if credentials are provided
 if (process.env.GITHUB_CLIENT_ID && 
     process.env.GITHUB_CLIENT_SECRET && 
-    process.env.GITHUB_CLIENT_ID !== 'your-github-client-id') {
+    process.env.GITHUB_CLIENT_ID !== 'your-github-client-id' &&
+    process.env.GITHUB_CLIENT_SECRET !== 'your-github-client-secret') {
   
   console.log('✓ Initializing GitHub OAuth');
   
