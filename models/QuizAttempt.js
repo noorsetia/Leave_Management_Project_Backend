@@ -16,9 +16,20 @@ const quizAttemptSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId,
       required: true,
     },
+    // For MCQ
     selectedAnswer: {
       type: Number,
-      required: true,
+    },
+    // For coding questions
+    code: {
+      type: String,
+    },
+    language: {
+      type: String,
+    },
+    // Additional metadata (grading status, correctness etc.)
+    _meta: {
+      type: mongoose.Schema.Types.Mixed,
     },
   }],
   score: {

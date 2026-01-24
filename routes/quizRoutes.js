@@ -10,6 +10,8 @@ const {
   getAllQuizzesForTeacher,
   updateQuiz,
   deleteQuiz,
+  executeCode,
+  runTestCases,
 } = require('../controllers/quizController');
 const { protect, restrictTo } = require('../middleware/authMiddleware');
 
@@ -23,6 +25,10 @@ router.get('/:id', restrictTo('student'), getQuiz);
 router.post('/:id/submit', restrictTo('student'), submitQuiz);
 router.get('/:id/results', restrictTo('student'), getQuizResults);
 
+// Coding execution routes (students only)
+router.post('/execute-code', restrictTo('student'), executeCode);
+router.post('/run-tests', restrictTo('student'), runTestCases);
+
 // Teacher routes
 router.post('/create', restrictTo('teacher'), createQuiz);
 router.get('/teacher/all', restrictTo('teacher'), getAllQuizzesForTeacher);
@@ -30,3 +36,4 @@ router.put('/:id', restrictTo('teacher'), updateQuiz);
 router.delete('/:id', restrictTo('teacher'), deleteQuiz);
 
 module.exports = router;
+
