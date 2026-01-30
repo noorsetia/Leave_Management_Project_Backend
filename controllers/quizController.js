@@ -1,6 +1,13 @@
 const Quiz = require('../models/Quiz');
 const QuizAttempt = require('../models/QuizAttempt');
 const { executeCode, runTestCases } = require('../services/codeExecutionService');
+const { 
+  generateQuizQuestions, 
+  evaluateCodingAnswer, 
+  generateCodingQuestion,
+  getCodeHints,
+  explainCode
+} = require('../services/geminiService');
 
 // @desc    Get all active quizzes
 // @route   GET /api/quiz
@@ -417,3 +424,209 @@ exports.runTestCases = async (req, res) => {
   }
 };
 
+// GEMINI AI ROUTES
+
+// @desc    Generate quiz questions using Gemini AI
+// @route   POST /api/quiz/generate-questions
+// @access  Private (Teacher)
+exports.generateQuestions = async (req, res) => {
+  try {
+    const { topic, difficulty, numQuestions } = req.body;
+
+    if (!topic) {
+      return res.status(400).json({ 
+        message: 'Topic is required' 
+      });
+    }
+
+    console.log(`Generating ${numQuestions || 5} questions on ${topic} (${difficulty || 'Medium'})`);
+
+    const result = await generateQuizQuestions(
+      topic, 
+      difficulty || 'Medium', 
+      numQuestions || 5
+    );
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        error: result.error
+      });
+    }
+
+    res.json({
+      success: true,
+      questions: result.questions,
+      topic: result.topic,
+      difficulty: result.difficulty,
+      generatedBy: result.generatedBy
+    });
+  } catch (error) {
+    console.error('Question generation error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error generating questions' 
+    });
+  }
+};
+
+// @desc    Evaluate coding answer using Gemini AI
+// @route   POST /api/quiz/evaluate-code
+// @access  Private (Student/Teacher)
+exports.evaluateCode = async (req, res) => {
+  try {
+    const { question, code, language, expectedOutput } = req.body;
+
+    if (!question || !code || !language) {
+      return res.status(400).json({ 
+        message: 'Question, code, and language are required' 
+      });
+    }
+
+    console.log(`Evaluating ${language} code for user: ${req.user.name}`);
+
+    const result = await evaluateCodingAnswer(
+      question,
+      code,
+      language,
+      expectedOutput
+    );
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        error: result.error
+      });
+    }
+
+    res.json({
+      success: true,
+      evaluation: result.evaluation,
+      evaluatedBy: result.evaluatedBy
+    });
+  } catch (error) {
+    console.error('Code evaluation error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error evaluating code' 
+    });
+  }
+};
+
+// @desc    Generate coding question using Gemini AI
+// @route   POST /api/quiz/generate-coding-question
+// @access  Private (Teacher)
+exports.generateCodingQuestionAI = async (req, res) => {
+  try {
+    const { topic, difficulty, language } = req.body;
+
+    if (!topic) {
+      return res.status(400).json({ 
+        message: 'Topic is required' 
+      });
+    }
+
+    console.log(`Generating ${difficulty || 'Medium'} ${language || 'Python'} coding question on ${topic}`);
+
+    const result = await generateCodingQuestion(
+      topic,
+      difficulty || 'Medium',
+      language || 'Python'
+    );
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        error: result.error
+      });
+    }
+
+    res.json({
+      success: true,
+      codingQuestion: result.codingQuestion,
+      generatedBy: result.generatedBy
+    });
+  } catch (error) {
+    console.error('Coding question generation error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error generating coding question' 
+    });
+  }
+};
+
+// @desc    Get hints for coding problem using Gemini AI
+// @route   POST /api/quiz/get-hints
+// @access  Private (Student)
+exports.getHints = async (req, res) => {
+  try {
+    const { question, code } = req.body;
+
+    if (!question) {
+      return res.status(400).json({ 
+        message: 'Question is required' 
+      });
+    }
+
+    console.log(`Getting hints for user: ${req.user.name}`);
+
+    const result = await getCodeHints(question, code);
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        error: result.error
+      });
+    }
+
+    res.json({
+      success: true,
+      hints: result.hints,
+      approach: result.approach,
+      timeComplexity: result.timeComplexity
+    });
+  } catch (error) {
+    console.error('Hints generation error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error getting hints' 
+    });
+  }
+};
+
+// @desc    Explain code using Gemini AI
+// @route   POST /api/quiz/explain-code
+// @access  Private (Student)
+exports.explainCodeAI = async (req, res) => {
+  try {
+    const { code, language } = req.body;
+
+    if (!code || !language) {
+      return res.status(400).json({ 
+        message: 'Code and language are required' 
+      });
+    }
+
+    console.log(`Explaining ${language} code for user: ${req.user.name}`);
+
+    const result = await explainCode(code, language);
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        error: result.error
+      });
+    }
+
+    res.json({
+      success: true,
+      explanation: result.explanation
+    });
+  } catch (error) {
+    console.error('Code explanation error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error explaining code' 
+    });
+  }
+};
