@@ -145,16 +145,25 @@ exports.getCurrentUser = async (req, res) => {
 exports.oauthSuccess = async (req, res) => {
   try {
     if (!req.user) {
-      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=authentication_failed`);
+      const redirectUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=authentication_failed`;
+      console.log('❌ OAuth failed - No user. Redirecting to:', redirectUrl);
+      return res.redirect(redirectUrl);
     }
 
     const token = generateToken(req.user._id);
+    const redirectUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/oauth/callback?token=${token}`;
+    
+    console.log('✅ OAuth success! Redirecting to:', redirectUrl);
+    console.log('   User:', req.user.email, '| Role:', req.user.role);
+    console.log('   FRONTEND_URL from env:', process.env.FRONTEND_URL);
     
     // Redirect to frontend with token
-    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/oauth/callback?token=${token}`);
+    res.redirect(redirectUrl);
   } catch (error) {
     console.error('OAuth success error:', error);
-    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=server_error`);
+    const redirectUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=server_error`;
+    console.log('❌ OAuth error. Redirecting to:', redirectUrl);
+    res.redirect(redirectUrl);
   }
 };
 

@@ -44,6 +44,7 @@ app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/leave', require('./routes/leaveRoutes'));
 app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 app.use('/api/quiz', require('./routes/quizRoutes'));
+app.use('/api/attendance', require('./routes/attendanceRoutes'));
 
 // Welcome route
 app.get('/', (req, res) => {
