@@ -6,14 +6,14 @@ const User = require('../models/User');
 // @access  Private (Teacher only)
 exports.markAttendance = async (req, res) => {
   try {
-    const { attendanceRecords, date, class: className, subject } = req.body;
+    const { attendanceRecords, date, class: className } = req.body;
 
     if (!attendanceRecords || !Array.isArray(attendanceRecords) || attendanceRecords.length === 0) {
       return res.status(400).json({ message: 'Attendance records are required' });
     }
 
-    if (!date || !className || !subject) {
-      return res.status(400).json({ message: 'Date, class, and subject are required' });
+    if (!date || !className) {
+      return res.status(400).json({ message: 'Date and class are required' });
     }
 
     const attendanceDate = new Date(date);
@@ -38,7 +38,7 @@ exports.markAttendance = async (req, res) => {
           {
             student: studentId,
             date: attendanceDate,
-            subject: subject
+            class: className
           },
           {
             student: studentId,
@@ -46,7 +46,6 @@ exports.markAttendance = async (req, res) => {
             date: attendanceDate,
             status: status,
             class: className,
-            subject: subject,
             remarks: remarks || '',
             lastModified: Date.now(),
             modifiedBy: req.user.id
@@ -82,10 +81,10 @@ exports.markAttendance = async (req, res) => {
 // @access  Private (Teacher only)
 exports.getClassAttendance = async (req, res) => {
   try {
-    const { date, class: className, subject } = req.query;
+    const { date, class: className } = req.query;
 
-    if (!date || !className || !subject) {
-      return res.status(400).json({ message: 'Date, class, and subject are required' });
+    if (!date || !className) {
+      return res.status(400).json({ message: 'Date and class are required' });
     }
 
     const attendanceDate = new Date(date);
@@ -93,8 +92,7 @@ exports.getClassAttendance = async (req, res) => {
 
     const attendance = await DailyAttendance.find({
       date: attendanceDate,
-      class: className,
-      subject: subject
+      class: className
     })
       .populate('student', 'name email avatar')
       .populate('teacher', 'name')
@@ -104,7 +102,6 @@ exports.getClassAttendance = async (req, res) => {
       attendance,
       date: attendanceDate,
       class: className,
-      subject: subject,
       total: attendance.length
     });
   } catch (error) {
