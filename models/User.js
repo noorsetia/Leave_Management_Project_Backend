@@ -25,6 +25,14 @@ const userSchema = new mongoose.Schema({
     enum: ['student', 'teacher'],
     required: [true, 'Please specify a role'],
   },
+  class: {
+    type: String,
+    enum: ['BCA 1st Year', 'BCA 2nd Year', 'BCA 3rd Year', 'MCA 1st Year', 'MCA 2nd Year'],
+  },
+  isCustomAdded: {
+    type: Boolean,
+    default: false,
+  },
   // OAuth provider information
   provider: {
     type: String,

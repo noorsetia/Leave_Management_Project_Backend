@@ -118,7 +118,7 @@ exports.getClassAttendance = async (req, res) => {
 // @access  Private (Teacher only)
 exports.getStudentsForAttendance = async (req, res) => {
   try {
-    const { class: className, date, subject } = req.query;
+    const { class: className, date } = req.query;
 
     if (!className) {
       return res.status(400).json({ message: 'Class is required' });
@@ -128,18 +128,17 @@ exports.getStudentsForAttendance = async (req, res) => {
     const students = await User.find({
       role: 'student',
       class: className
-    }).select('name email avatar class').sort({ name: 1 });
+    }).select('name email avatar class isCustomAdded').sort({ name: 1 });
 
     // If date is provided, get existing attendance for that date
     let existingAttendance = [];
-    if (date && subject) {
+    if (date) {
       const attendanceDate = new Date(date);
       attendanceDate.setHours(0, 0, 0, 0);
 
       existingAttendance = await DailyAttendance.find({
         date: attendanceDate,
-        class: className,
-        subject: subject
+        class: className
       });
     }
 
@@ -155,6 +154,7 @@ exports.getStudentsForAttendance = async (req, res) => {
         email: student.email,
         avatar: student.avatar,
         class: student.class,
+        isCustomAdded: student.isCustomAdded || false,
         status: attendance ? attendance.status : null,
         remarks: attendance ? attendance.remarks : '',
         markedAt: attendance ? attendance.timeMarked : null
@@ -343,5 +343,81 @@ exports.deleteAttendance = async (req, res) => {
   } catch (error) {
     console.error('Delete attendance error:', error);
     res.status(500).json({ message: 'Error deleting attendance', error: error.message });
+  }
+};
+
+// @desc    Add custom student to a class
+// @route   POST /api/attendance/students/add
+// @access  Private (Teacher only)
+exports.addCustomStudent = async (req, res) => {
+  try {
+    const { name, email, class: className } = req.body;
+
+    if (!name || !email || !className) {
+      return res.status(400).json({ message: 'Name, email, and class are required' });
+    }
+
+    // Check if student with this email already exists
+    const existingStudent = await User.findOne({ email: email.toLowerCase() });
+    if (existingStudent) {
+      return res.status(400).json({ message: 'Student with this email already exists' });
+    }
+
+    // Create new student
+    const student = await User.create({
+      name: name.trim(),
+      email: email.toLowerCase().trim(),
+      role: 'student',
+      class: className,
+      isCustomAdded: true,
+      provider: 'local',
+      password: Math.random().toString(36).slice(-8) // Random temporary password
+    });
+
+    res.status(201).json({
+      message: 'Student added successfully',
+      student: {
+        _id: student._id,
+        name: student.name,
+        email: student.email,
+        class: student.class,
+        isCustomAdded: student.isCustomAdded
+      }
+    });
+  } catch (error) {
+    console.error('Add custom student error:', error);
+    res.status(500).json({ message: 'Error adding student', error: error.message });
+  }
+};
+
+// @desc    Remove custom student
+// @route   DELETE /api/attendance/students/:studentId
+// @access  Private (Teacher only)
+exports.removeCustomStudent = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+
+    const student = await User.findById(studentId);
+
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    if (!student.isCustomAdded) {
+      return res.status(403).json({ message: 'Cannot remove enrolled students. Only custom-added students can be removed.' });
+    }
+
+    // Delete the student
+    await User.findByIdAndDelete(studentId);
+
+    // Also delete all their attendance records
+    await DailyAttendance.deleteMany({ student: studentId });
+
+    res.status(200).json({
+      message: 'Student removed successfully'
+    });
+  } catch (error) {
+    console.error('Remove custom student error:', error);
+    res.status(500).json({ message: 'Error removing student', error: error.message });
   }
 };

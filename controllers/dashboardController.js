@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const LeaveRequest = require('../models/LeaveRequest');
 const Attendance = require('../models/Attendance');
+const DailyAttendance = require('../models/DailyAttendance');
 
 // Get teacher dashboard statistics
 const getTeacherStats = async (req, res) => {
@@ -33,6 +34,20 @@ const getTeacherStats = async (req, res) => {
       ? Math.round((approvedRequests / totalProcessed) * 100) 
       : 0;
 
+    // Today's attendance statistics
+    const todayAttendance = await DailyAttendance.find({
+      date: today,
+      teacher: req.user.id
+    });
+
+    const attendanceStats = {
+      total: todayAttendance.length,
+      present: todayAttendance.filter(a => a.status === 'present').length,
+      absent: todayAttendance.filter(a => a.status === 'absent').length,
+      late: todayAttendance.filter(a => a.status === 'late').length,
+      excused: todayAttendance.filter(a => a.status === 'excused').length,
+    };
+
     res.json({
       totalRequests,
       pendingRequests,
@@ -41,6 +56,7 @@ const getTeacherStats = async (req, res) => {
       todayRequests,
       totalStudents,
       approvalRate,
+      attendanceStats,
     });
   } catch (error) {
     console.error('Error fetching teacher stats:', error);
@@ -66,20 +82,49 @@ const getStudentStats = async (req, res) => {
     const approvedRequests = leaveRequests.filter(req => req.status === 'approved').length;
     const rejectedRequests = leaveRequests.filter(req => req.status === 'rejected').length;
 
-    // Get attendance
+    // Get attendance from old model
     const attendance = await Attendance.findOne({ student: studentId });
     const attendancePercentage = attendance?.percentage || 0;
 
+    // Get daily attendance statistics (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const dailyAttendance = await DailyAttendance.find({
+      student: studentId,
+      date: { $gte: thirtyDaysAgo }
+    });
+
+    const attendanceStats = {
+      total: dailyAttendance.length,
+      present: dailyAttendance.filter(a => a.status === 'present').length,
+      absent: dailyAttendance.filter(a => a.status === 'absent').length,
+      late: dailyAttendance.filter(a => a.status === 'late').length,
+      excused: dailyAttendance.filter(a => a.status === 'excused').length,
+      percentage: dailyAttendance.length > 0 
+        ? Math.round((dailyAttendance.filter(a => a.status === 'present').length / dailyAttendance.length) * 100)
+        : attendancePercentage
+    };
+
     // Recent requests (last 5)
     const recentRequests = leaveRequests.slice(0, 5);
+
+    // Recent attendance (last 10 days)
+    const recentAttendance = await DailyAttendance.find({ student: studentId })
+      .sort({ date: -1 })
+      .limit(10)
+      .populate('teacher', 'name')
+      .select('date status subject class remarks');
 
     res.json({
       totalRequests,
       pendingRequests,
       approvedRequests,
       rejectedRequests,
-      attendancePercentage,
+      attendancePercentage: attendanceStats.percentage,
+      attendanceStats,
       recentRequests,
+      recentAttendance,
     });
   } catch (error) {
     console.error('Error fetching student stats:', error);

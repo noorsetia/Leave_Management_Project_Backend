@@ -7,7 +7,9 @@ const {
   getStudentAttendance,
   getAttendanceSummary,
   updateAttendance,
-  deleteAttendance
+  deleteAttendance,
+  addCustomStudent,
+  removeCustomStudent
 } = require('../controllers/attendanceController');
 const { protect, restrictTo } = require('../middleware/authMiddleware');
 
@@ -31,5 +33,11 @@ router.put('/:id', protect, restrictTo('teacher'), updateAttendance);
 
 // Delete attendance record (Teacher only)
 router.delete('/:id', protect, restrictTo('teacher'), deleteAttendance);
+
+// Add custom student (Teacher only)
+router.post('/students/add', protect, restrictTo('teacher'), addCustomStudent);
+
+// Remove custom student (Teacher only)
+router.delete('/students/:studentId', protect, restrictTo('teacher'), removeCustomStudent);
 
 module.exports = router;
