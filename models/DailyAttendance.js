@@ -26,7 +26,7 @@ const dailyAttendanceSchema = new mongoose.Schema({
   },
   subject: {
     type: String,
-    required: true
+    required: false
   },
   period: {
     type: String,
@@ -52,13 +52,12 @@ const dailyAttendanceSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Compound index to ensure one attendance entry per student per subject per day
-dailyAttendanceSchema.index({ student: 1, date: 1, subject: 1 }, { unique: true });
+// Compound index to ensure one attendance entry per student per day
+dailyAttendanceSchema.index({ student: 1, date: 1, class: 1 }, { unique: true });
 
 // Indexes for efficient queries
 dailyAttendanceSchema.index({ teacher: 1, date: 1 });
 dailyAttendanceSchema.index({ student: 1, date: 1 });
 dailyAttendanceSchema.index({ class: 1, date: 1 });
-dailyAttendanceSchema.index({ date: 1, class: 1, subject: 1 });
 
 module.exports = mongoose.model('DailyAttendance', dailyAttendanceSchema);
