@@ -83,6 +83,63 @@ const leaveRequestSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  // Assessment required as part of leave (student chooses to take a test)
+  assessmentRequired: {
+    type: Boolean,
+    default: false,
+  },
+  // Section/topic selected for assessment (e.g., Frontend, Backend, Data Structures)
+  assessmentSection: {
+    type: String,
+    trim: true,
+  },
+  // Generated or selected assessment questions stored with full metadata
+  assessmentQuestions: {
+    type: [
+      {
+        question: String,
+        options: [String],
+        type: { type: String },
+        correctAnswer: {},
+        points: { type: Number, default: 1 },
+        // Indicates which service generated this question (e.g., 'Gemini AI' or 'local-fallback')
+        generatedBy: { type: String },
+        // Flag set to true when question was produced by local fallback generator
+        isFallback: { type: Boolean, default: false },
+        // For coding question fields (optional)
+        starterCode: String,
+        language: String,
+      }
+    ],
+    default: [],
+  },
+  assessmentScore: {
+    type: Number,
+    min: 0,
+    max: 100,
+  },
+  assessmentPassed: {
+    type: Boolean,
+    default: false,
+  },
+  assessmentAttempted: {
+    type: Boolean,
+    default: false,
+  },
+  assessmentSubmittedAt: {
+    type: Date,
+  },
+  assessmentSubmittedAnswers: {
+    type: [
+      {
+        id: Number,
+        selectedAnswer: {},
+        code: String,
+        language: String,
+      }
+    ],
+    default: []
+  },
   // Teacher Review
   reviewedBy: {
     type: mongoose.Schema.Types.ObjectId,

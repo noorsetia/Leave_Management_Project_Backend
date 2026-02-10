@@ -38,18 +38,16 @@ const submitCode = async (code, language, stdin = '') => {
       throw new Error(`Unsupported language: ${language}`);
     }
 
-    if (!JUDGE0_API_KEY) {
-      throw new Error('Judge0 API key not configured. Please set JUDGE0_API_KEY in .env file');
-    }
+    // Prepare request options. Support two modes:
+    // 1) RapidAPI-hosted Judge0 (requires JUDGE0_API_KEY and JUDGE0_API_HOST)
+    // 2) Self-hosted Judge0 instance (no API key required) specified by JUDGE0_API_URL
 
     const options = {
       method: 'POST',
-      url: `${JUDGE0_API_URL}/submissions`,
+      url: `${JUDGE0_API_URL.replace(/\/$/, '')}/submissions`,
       params: { base64_encoded: 'false', wait: 'false' },
       headers: {
-        'content-type': 'application/json',
-        'X-RapidAPI-Key': JUDGE0_API_KEY,
-        'X-RapidAPI-Host': JUDGE0_API_HOST
+        'content-type': 'application/json'
       },
       data: {
         source_code: code,
@@ -57,6 +55,15 @@ const submitCode = async (code, language, stdin = '') => {
         stdin: stdin
       }
     };
+
+    // If using RapidAPI-hosted Judge0, include RapidAPI headers
+    if (JUDGE0_API_URL.includes('rapidapi') || JUDGE0_API_HOST.includes('rapidapi')) {
+      if (!JUDGE0_API_KEY) {
+        throw new Error('Judge0 API key not configured. Please set JUDGE0_API_KEY for RapidAPI Judge0 or set JUDGE0_API_URL to your self-hosted instance');
+      }
+      options.headers['X-RapidAPI-Key'] = JUDGE0_API_KEY;
+      options.headers['X-RapidAPI-Host'] = JUDGE0_API_HOST;
+    }
 
     const response = await axios.request(options);
     return {
@@ -79,19 +86,20 @@ const submitCode = async (code, language, stdin = '') => {
  */
 const getSubmissionResult = async (token) => {
   try {
-    if (!JUDGE0_API_KEY) {
-      throw new Error('Judge0 API key not configured');
-    }
-
     const options = {
       method: 'GET',
-      url: `${JUDGE0_API_URL}/submissions/${token}`,
+      url: `${JUDGE0_API_URL.replace(/\/$/, '')}/submissions/${token}`,
       params: { base64_encoded: 'false' },
-      headers: {
-        'X-RapidAPI-Key': JUDGE0_API_KEY,
-        'X-RapidAPI-Host': JUDGE0_API_HOST
-      }
+      headers: {}
     };
+
+    if (JUDGE0_API_URL.includes('rapidapi') || JUDGE0_API_HOST.includes('rapidapi')) {
+      if (!JUDGE0_API_KEY) {
+        throw new Error('Judge0 API key not configured for RapidAPI-hosted Judge0');
+      }
+      options.headers['X-RapidAPI-Key'] = JUDGE0_API_KEY;
+      options.headers['X-RapidAPI-Host'] = JUDGE0_API_HOST;
+    }
 
     const response = await axios.request(options);
     const result = response.data;

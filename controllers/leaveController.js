@@ -1,13 +1,15 @@
 const LeaveRequest = require('../models/LeaveRequest');
 const User = require('../models/User');
 const Attendance = require('../models/Attendance');
+const Notification = require('../models/Notification');
+const { generateQuizQuestions } = require('../services/geminiService');
 
 // @desc    Create a new leave request
 // @route   POST /api/leave
 // @access  Private (Student only)
 exports.createLeaveRequest = async (req, res) => {
   try {
-    const { leaveType, description, startDate, endDate } = req.body;
+    const { leaveType, description, startDate, endDate, assessmentRequired, assessmentSection } = req.body;
 
     // Validation
     if (!leaveType || !description || !startDate || !endDate) {
@@ -60,7 +62,7 @@ exports.createLeaveRequest = async (req, res) => {
     const attendance = await Attendance.findOne({ student: req.user._id });
 
     // Create leave request
-    const leaveRequest = await LeaveRequest.create({
+    const leaveData = {
       student: req.user._id,
       leaveType,
       description,
@@ -68,10 +70,46 @@ exports.createLeaveRequest = async (req, res) => {
       endDate: end,
       attendancePercentage: attendance ? attendance.attendancePercentage : 0,
       attendanceEligible: attendance ? attendance.isEligible : false,
-    });
+      assessmentRequired: !!assessmentRequired,
+    };
+
+    // If student asked for assessment, record section and generate questions (12 questions)
+    if (assessmentRequired && assessmentSection) {
+      leaveData.assessmentSection = assessmentSection;
+      try {
+        const gen = await generateQuizQuestions(assessmentSection, 'Medium', 12);
+        if (gen.success && Array.isArray(gen.questions)) {
+          // store generated questions in the leave (including correctAnswer so teacher can review)
+          leaveData.assessmentQuestions = gen.questions.map((q) => ({
+            question: q.question || q.prompt || '',
+            options: q.options || [],
+            type: q.type || 'mcq',
+            correctAnswer: q.correctAnswer,
+            points: q.points || 1,
+            generatedBy: gen.generatedBy || q.generatedBy || null,
+            isFallback: (gen.generatedBy === 'local-fallback') || !!q.isFallback,
+          }));
+        }
+      } catch (gerr) {
+        console.error('Generate questions error:', gerr.message || gerr);
+      }
+    }
+
+    const leaveRequest = await LeaveRequest.create(leaveData);
 
     // Populate student details
     await leaveRequest.populate('student', 'name email role');
+
+    // Create a notification for teachers (simple approach: create a notification for all teachers is expensive,
+    // so create a notification tied to an admin/teacher id later. For now, create a system notification placeholder
+    // for the leave owner (student) and rely on teacher dashboard polling the /api/leave endpoint.)
+    await Notification.create({
+      user: req.user._id,
+      title: 'Leave request submitted',
+      message: `Your leave request for ${leaveRequest.numberOfDays} day(s) has been submitted and is pending review.`,
+      link: `/student/leave/${leaveRequest._id}`,
+      meta: { leaveId: leaveRequest._id }
+    });
 
     res.status(201).json({
       message: 'Leave request submitted successfully',
@@ -174,6 +212,143 @@ exports.getLeaveRequest = async (req, res) => {
   }
 };
 
+// @desc    Get assessment questions for a leave request (student only)
+// @route   GET /api/leave/:id/assessment
+// @access  Private (Student only)
+exports.getAssessmentQuestions = async (req, res) => {
+  try {
+    const leaveRequest = await LeaveRequest.findById(req.params.id);
+    if (!leaveRequest) return res.status(404).json({ message: 'Leave request not found' });
+
+    // Only the student who created the leave can fetch assessment questions
+    if (req.user.role === 'student' && leaveRequest.student.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'You do not have access to these assessment questions' });
+    }
+
+    if (!leaveRequest.assessmentRequired) {
+      return res.status(400).json({ message: 'No assessment required for this leave request' });
+    }
+
+    // If assessment was requested but questions are not yet generated or stored, attempt on-demand generation
+    if ((!leaveRequest.assessmentQuestions || leaveRequest.assessmentQuestions.length === 0) && leaveRequest.assessmentSection) {
+      try {
+        const gen = await generateQuizQuestions(leaveRequest.assessmentSection, 'Medium', 12);
+        if (gen.success && Array.isArray(gen.questions) && gen.questions.length > 0) {
+          leaveRequest.assessmentQuestions = gen.questions.map((q) => ({
+            question: q.question || q.prompt || '',
+            options: q.options || [],
+            type: q.type || 'mcq',
+            correctAnswer: q.correctAnswer,
+            points: q.points || 1,
+            starterCode: q.starterCode || null,
+            language: q.language || null,
+            generatedBy: gen.generatedBy || q.generatedBy || null,
+            isFallback: (gen.generatedBy === 'local-fallback') || !!q.isFallback,
+          }));
+          await leaveRequest.save();
+        }
+      } catch (gerr) {
+        console.error('On-demand generate questions error:', gerr.message || gerr);
+      }
+    }
+
+    // Send questions without the correct answers
+    const questionsForStudent = (leaveRequest.assessmentQuestions || []).map((q, idx) => ({
+      id: idx,
+      question: q.question,
+      options: q.options || [],
+      type: q.type || 'mcq',
+      points: q.points || 1,
+      starterCode: q.starterCode || null,
+      language: q.language || null,
+    }));
+
+    res.json({
+      assessment: {
+        section: leaveRequest.assessmentSection,
+        questions: questionsForStudent,
+      }
+    });
+  } catch (error) {
+    console.error('Get assessment questions error:', error);
+    res.status(500).json({ message: 'Error fetching assessment questions' });
+  }
+};
+
+// @desc    Submit assessment answers for a leave request
+// @route   POST /api/leave/:id/submit-assessment
+// @access  Private (Student only)
+exports.submitAssessment = async (req, res) => {
+  try {
+    const { answers, startedAt } = req.body; // answers: [{id, selectedAnswer, code?}]
+    const leaveRequest = await LeaveRequest.findById(req.params.id);
+    if (!leaveRequest) return res.status(404).json({ message: 'Leave request not found' });
+
+    // Ensure ownership
+    if (leaveRequest.student.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'You do not have permission to submit this assessment' });
+    }
+
+    if (!leaveRequest.assessmentRequired || !leaveRequest.assessmentQuestions || leaveRequest.assessmentQuestions.length === 0) {
+      return res.status(400).json({ message: 'No assessment available for this request' });
+    }
+
+    if (leaveRequest.assessmentAttempted) {
+      return res.status(400).json({ message: 'Assessment already submitted for this leave request' });
+    }
+
+    // Grade MCQ answers locally
+    const submittedAt = new Date();
+    const timeTaken = startedAt ? Math.floor((submittedAt - new Date(startedAt)) / 1000) : null;
+
+    let earnedPoints = 0;
+    const totalPoints = (leaveRequest.assessmentQuestions || []).reduce((s, q) => s + (q.points || 1), 0);
+
+    (answers || []).forEach((ans) => {
+      const q = leaveRequest.assessmentQuestions[ans.id];
+      if (!q) return;
+      if ((q.type || 'mcq') === 'mcq') {
+        const correct = q.correctAnswer;
+        if (typeof correct !== 'undefined' && ans.selectedAnswer === correct) {
+          earnedPoints += (q.points || 1);
+        }
+      }
+      // For coding answers we may queue review or call evaluateCodingAnswer in future
+    });
+
+    const percentage = totalPoints > 0 ? (earnedPoints / totalPoints) * 100 : 0;
+    const passed = percentage >= 60; // pass threshold (tunable)
+
+  leaveRequest.assessmentScore = parseFloat(percentage.toFixed(2));
+  leaveRequest.assessmentPassed = !!passed;
+  leaveRequest.assessmentAttempted = true;
+  leaveRequest.assessmentSubmittedAt = submittedAt;
+  // store submitted answers for teacher review
+  leaveRequest.assessmentSubmittedAnswers = answers || [];
+
+    await leaveRequest.save();
+
+    // Notify teacher(s) — create a notification for the student as confirmation
+    await Notification.create({
+      user: req.user._id,
+      title: 'Assessment submitted',
+      message: `You submitted the assessment for leave request ${leaveRequest._id}. Score: ${leaveRequest.assessmentScore}%`,
+      link: `/student/leave/${leaveRequest._id}`,
+      meta: { leaveId: leaveRequest._id }
+    });
+
+    res.json({
+      message: 'Assessment submitted successfully',
+      score: leaveRequest.assessmentScore,
+      passed: leaveRequest.assessmentPassed,
+      timeTaken,
+    });
+  } catch (error) {
+    console.error('Submit assessment error:', error);
+    res.status(500).json({ message: 'Error submitting assessment' });
+  }
+};
+
 // @desc    Update leave request status (approve/reject)
 // @route   PUT /api/leave/:id/status
 // @access  Private (Teacher only)
@@ -209,6 +384,19 @@ exports.updateLeaveStatus = async (req, res) => {
     await leaveRequest.save();
     await leaveRequest.populate('student', 'name email role');
     await leaveRequest.populate('reviewedBy', 'name email');
+
+    // Create notification for the student about review outcome
+    try {
+      await Notification.create({
+        user: leaveRequest.student._id || leaveRequest.student,
+        title: `Leave request ${status}`,
+        message: `Your leave request has been ${status} by ${req.user.name}.`,
+        link: `/student/leave/${leaveRequest._id}`,
+        meta: { leaveId: leaveRequest._id, status }
+      });
+    } catch (nerr) {
+      console.error('Notification create error:', nerr);
+    }
 
     res.json({
       message: `Leave request ${status} successfully`,

@@ -73,10 +73,147 @@ Make questions relevant for BCA/Computer Science students. Focus on practical kn
     };
   } catch (error) {
     console.error('Error generating quiz questions:', error.response?.data || error.message);
-    return {
-      success: false,
-      error: error.response?.data?.error?.message || error.message
-    };
+
+    // Fallback: generate topic-aware MCQs locally so the application remains usable
+    try {
+      const t = (topic || '').toLowerCase();
+
+      const templates = {
+        frontend: [
+          {
+            q: (i) => `What is the purpose of the Virtual DOM in frontend frameworks?`,
+            correct: 'To efficiently update and render UI by diffing changes',
+            distractors: [
+              'To store application state on the server',
+              'To compile CSS into JavaScript',
+              'To manage database queries from the browser'
+            ]
+          },
+          {
+            q: (i) => `Which HTML element is used to include a script in a webpage?`,
+            correct: '<script>',
+            distractors: ['<link>', '<style>', '<component>']
+          },
+          {
+            q: (i) => `Which CSS property is used to change the text color?`,
+            correct: 'color',
+            distractors: ['font-size', 'background', 'margin']
+          }
+        ],
+        backend: [
+          {
+            q: (i) => `What is the primary purpose of a RESTful API?`,
+            correct: 'To provide stateless HTTP endpoints for resources',
+            distractors: ['To render HTML on the server', 'To store files on disk', 'To style web pages']
+          },
+          {
+            q: (i) => `Which database operation does "CRUD" include?`,
+            correct: 'Create, Read, Update, Delete',
+            distractors: ['Compile, Run, Upload, Download', 'Connect, Retry, Update, Drop', 'Cache, Restore, Undo, Delete']
+          },
+          {
+            q: (i) => `What is middleware in a backend framework?`,
+            correct: 'A function that processes requests before handlers',
+            distractors: ['A frontend styling library', 'A database indexing method', 'A network protocol']
+          }
+        ],
+        'data structures': [
+          {
+            q: (i) => `Which data structure uses LIFO (last-in, first-out)?`,
+            correct: 'Stack',
+            distractors: ['Queue', 'Tree', 'Graph']
+          },
+          {
+            q: (i) => `What is the average time complexity to search in a balanced binary search tree?`,
+            correct: 'O(log n)',
+            distractors: ['O(n)', 'O(1)', 'O(n log n)']
+          }
+        ],
+        algorithms: [
+          {
+            q: (i) => `Which sorting algorithm has average-case complexity O(n log n)?`,
+            correct: 'Merge sort (or Quick sort)',
+            distractors: ['Bubble sort', 'Selection sort', 'Insertion sort']
+          },
+          {
+            q: (i) => `What technique does dynamic programming use?`,
+            correct: 'Reuse previously computed results (memoization)',
+            distractors: ['Randomized sampling', 'Divide and conquer only', 'Pure recursion without memo']
+          }
+        ],
+        database: [
+          {
+            q: (i) => `What does ACID stand for in databases?`,
+            correct: 'Atomicity, Consistency, Isolation, Durability',
+            distractors: ['Availability, Consistency, Integrity, Durability', 'Atomicity, Cache, Index, Durability', 'Accuracy, Consistency, Isolation, Dependency']
+          },
+          {
+            q: (i) => `Which SQL clause is used to filter rows returned by a query?`,
+            correct: 'WHERE',
+            distractors: ['GROUP BY', 'HAVING', 'ORDER BY']
+          }
+        ],
+        devops: [
+          {
+            q: (i) => `What is the purpose of a CI/CD pipeline?`,
+            correct: 'Automate build, test, and deployment processes',
+            distractors: ['Manage database schemas manually', 'Style frontend components', 'Serve static files only']
+          },
+          {
+            q: (i) => `Which tool is commonly used for container orchestration?`,
+            correct: 'Kubernetes',
+            distractors: ['Webpack', 'Jest', 'Nginx']
+          }
+        ]
+      };
+
+      // pick a template list based on topic; fallback to generic
+      const pickKey = Object.keys(templates).find((k) => t.includes(k)) || 'backend';
+      const pool = templates[pickKey] || templates.backend;
+
+      const shuffleArray = (arr) => arr.sort(() => Math.random() - 0.5);
+
+      const fallbackQuestions = Array.from({ length: numQuestions }).map((_, idx) => {
+        const template = pool[idx % pool.length];
+        const questionText = template.q(idx + 1);
+        const correct = template.correct;
+        const distractors = template.distractors.slice();
+
+        // Ensure we have 3 distractors; if fewer, add generic distractors
+        while (distractors.length < 3) {
+          distractors.push(`Incorrect option about ${topic}`);
+        }
+
+        // Build options and shuffle while tracking correct index
+        const options = [correct, ...distractors.slice(0, 3)];
+        const shuffled = shuffleArray(options.slice());
+        const correctIndex = shuffled.indexOf(correct);
+
+        return {
+          question: questionText,
+          options: shuffled,
+          correctAnswer: correctIndex,
+          explanation: `Answer: ${correct}.`,
+          points: 1,
+          type: 'mcq',
+          isFallback: true
+        };
+      });
+
+      return {
+        success: true,
+        questions: fallbackQuestions,
+        topic,
+        difficulty,
+        generatedBy: 'local-fallback'
+      };
+    } catch (fallbackError) {
+      console.error('Fallback generation error:', fallbackError);
+      return {
+        success: false,
+        error: error.response?.data?.error?.message || error.message
+      };
+    }
   }
 };
 

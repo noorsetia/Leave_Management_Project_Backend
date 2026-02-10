@@ -9,6 +9,7 @@ const {
   deleteLeaveRequest,
   getLeaveStats
 } = require('../controllers/leaveController');
+const { getAssessmentQuestions, submitAssessment } = require('../controllers/leaveController');
 const { protect, isStudent, isTeacher } = require('../middleware/authMiddleware');
 
 // Async handler wrapper
@@ -19,6 +20,8 @@ const asyncHandler = (fn) => (req, res, next) => {
 // Student routes
 router.post('/', protect, isStudent, asyncHandler(createLeaveRequest));
 router.get('/my-leaves', protect, isStudent, asyncHandler(getMyLeaveRequests));
+router.get('/:id/assessment', protect, isStudent, asyncHandler(getAssessmentQuestions));
+router.post('/:id/submit-assessment', protect, isStudent, asyncHandler(submitAssessment));
 router.get('/stats', protect, isStudent, asyncHandler(getLeaveStats));
 router.delete('/:id', protect, isStudent, asyncHandler(deleteLeaveRequest));
 

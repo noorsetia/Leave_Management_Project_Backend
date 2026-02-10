@@ -1,6 +1,7 @@
-[dotenv@17.2.3] injecting env (12) from .env -- tip: 🔑 add access controls to secrets: https://dotenvx.com/ops
+nohup: ignoring input
+[dotenv@17.2.3] injecting env (16) from .env -- tip: 📡 add observability to secrets: https://dotenvx.com/ops
 ✓ Initializing Google OAuth
 ✓ Initializing GitHub OAuth
-🚀 Server running on port 5000
-📡 API available at http://localhost:5000
-✅ MongoDB Connected: ac-witzj3t-shard-00-02.l1vpd3x.mongodb.net
+🚀 Server running on port 5001
+📡 API available at http://localhost:5001
+✅ MongoDB Connected: 127.0.0.1
